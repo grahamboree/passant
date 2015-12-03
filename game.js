@@ -329,6 +329,7 @@ function isCheck(state) {
 			return true;
 		}
 	}
+	return false;
 }
 
 function render(state) {
