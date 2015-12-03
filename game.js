@@ -29,6 +29,7 @@ var selectedPiece = null,
 	};
 
 function validCoordinate(x, y) { return (x >= 0 && x < 8 && y >= 0 && y < 8); }
+function flipColor(color) { return color === 'white' ? 'black' : 'white'; }
 
 function initialState() {
 	var i,
@@ -291,7 +292,7 @@ function possibleMoves(board, x, y) {
 	}
 }
 
-function allPossibleMoves(state) {
+function allPossibleMoves(board, color) {
 	var x,
 		y,
 		moves = [],
@@ -299,8 +300,8 @@ function allPossibleMoves(state) {
 
 	for (x = 0; x < 8; x++) {
 		for (y = 0; y < 8; y++) {
-			if (state.board[x][y].color === state.turnColor) {
-				moves = moves.concat(possibleMoves(state.board, x, y).map(makeMove));
+			if (board[x][y].color === color) {
+				moves = moves.concat(possibleMoves(board, x, y).map(makeMove));
 			}
 		}
 	}
@@ -308,11 +309,32 @@ function allPossibleMoves(state) {
 	return moves;
 }
 
+function isCheck(state) {
+	var x, y, i, possibleMoves, data, kingCoord;
+
+	// Find the king for the current color.
+	for (x = 0; x < 8; x++) {
+		for (y = 0; y < 8; y++) {
+			data = state.board[x][y];
+			if (data.color === state.turnColor && data.piece === 'king') {
+				kingCoord = {x: x, y: y};
+			}
+		}
+	}
+
+	possibleMoves = allPossibleMoves(state.board, flipColor(state.turnColor));
+
+	for (i = 0; i < possibleMoves.length; i++) {
+		if (possibleMoves[i][1][0] === kingCoord.x && possibleMoves[i][1][1] === kingCoord.y) {
+			return true;
+		}
+	}
+}
+
 function render(state) {
 	var x,
 		y,
-		data,
-		i;
+		data;
 
 	for (x = 0; x < 8; x++) {
 		for (y = 0; y < 8; y++) {
@@ -323,17 +345,22 @@ function render(state) {
 	}
 
 	availableMoves.forEach(function(coord) { PS.color(coord[0], coord[1], 0xfaaa40); });
+
+	if (isCheck(state)) {
+		PS.statusText("Check");
+	}
 }
 
 // Returns a move given the current board state.
 function AI(state) {
-	var moves = allPossibleMoves(state);
+	var moves = allPossibleMoves(state.board, state.turnColor);
 
 	// Chose the move randomly.
 	return moves[PS.random(moves.length) - 1];
 }
 
 PS.init = function() {
+	PS.statusText("");
 	state = initialState();
 
 	PS.gridSize(8, 8);
@@ -349,16 +376,14 @@ PS.touch = function(x, y) {
 		if (availableMoves[i][0] === x && availableMoves[i][1] === y) {
 			move(state.board, selectedPiece[0], selectedPiece[1], x, y);
 
-			state.turnColor = state.turnColor === "white" ? "black" : "white";
+			state.turnColor = flipColor(state.turnColor);
 
 			selectedPiece = [];
 			availableMoves = [];
 
 			aiMove = AI(state);
-
-			state.turnColor = state.turnColor === "white" ? "black" : "white";
-
 			move(state.board, aiMove[0][0], aiMove[0][1], aiMove[1][0], aiMove[1][1]);
+			state.turnColor = flipColor(state.turnColor);
 
 			render(state);
 			return;
