@@ -1,11 +1,13 @@
 /*jslint nomen: true, white: true */
 /*global PS */
+
 "use strict";
 
 var selectedPiece = null,
 	availableMoves = [],
-	boardState = [],
-	whitesTurn = true,
+
+	state = {},
+
 	unicodePieces = {
 		// Unicode chess pieces.
 		black: {
@@ -28,48 +30,55 @@ var selectedPiece = null,
 
 function validCoordinate(x, y) { return (x >= 0 && x < 8 && y >= 0 && y < 8); }
 
-function makePiece(color, piece) {
-	return {
-		piece: piece,
-		color: color,
-		hasMoved: false
+function initialState() {
+	var i,
+		state,
+		makePiece;
+
+	state = {
+		turnColor: 'white',
+		board: []
 	};
-}
 
-function makeBoard() {
-	var i, board = [];
-
+	makePiece = function(color, piece) {
+		return {
+			piece: piece,
+			color: color,
+			hasMoved: false
+		};
+	};
+	
 	for (i = 0; i < 8; i++) {
-		board[i] = [0, 0, 0, 0, 0, 0, 0, 0];
+		state.board[i] = [0, 0, 0, 0, 0, 0, 0, 0];
 	}
 
-	board[0][0] = makePiece('black', 'rook');
-	board[1][0] = makePiece('black', 'knight');
-	board[2][0] = makePiece('black', 'bishop');
-	board[3][0] = makePiece('black', 'queen');
-	board[4][0] = makePiece('black', 'king');
-	board[5][0] = makePiece('black', 'bishop');
-	board[6][0] = makePiece('black', 'knight');
-	board[7][0] = makePiece('black', 'rook');
+	state.board[0][0] = makePiece('black', 'rook');
+	state.board[1][0] = makePiece('black', 'knight');
+	state.board[2][0] = makePiece('black', 'bishop');
+	state.board[3][0] = makePiece('black', 'queen');
+	state.board[4][0] = makePiece('black', 'king');
+	state.board[5][0] = makePiece('black', 'bishop');
+	state.board[6][0] = makePiece('black', 'knight');
+	state.board[7][0] = makePiece('black', 'rook');
 
 	for (i = 0; i < 8; i++) {
-		board[i][1] = makePiece('black', 'pawn');
+		state.board[i][1] = makePiece('black', 'pawn');
 	}
 
-	board[0][7] = makePiece('white', 'rook');
-	board[1][7] = makePiece('white', 'knight');
-	board[2][7] = makePiece('white', 'bishop');
-	board[3][7] = makePiece('white', 'queen');
-	board[4][7] = makePiece('white', 'king');
-	board[5][7] = makePiece('white', 'bishop');
-	board[6][7] = makePiece('white', 'knight');
-	board[7][7] = makePiece('white', 'rook');
+	state.board[0][7] = makePiece('white', 'rook');
+	state.board[1][7] = makePiece('white', 'knight');
+	state.board[2][7] = makePiece('white', 'bishop');
+	state.board[3][7] = makePiece('white', 'queen');
+	state.board[4][7] = makePiece('white', 'king');
+	state.board[5][7] = makePiece('white', 'bishop');
+	state.board[6][7] = makePiece('white', 'knight');
+	state.board[7][7] = makePiece('white', 'rook');
 
 	for (i = 0; i < 8; i++) {
-		board[i][6] = makePiece('white', 'pawn');
+		state.board[i][6] = makePiece('white', 'pawn');
 	}
 
-	return board;
+	return state;
 }
 
 function move(board, x, y, newX, newY) {
@@ -282,7 +291,24 @@ function possibleMoves(board, x, y) {
 	}
 }
 
-function renderBoard(board) {
+function allPossibleMoves(state) {
+	var x,
+		y,
+		moves = [],
+		makeMove = function(move) { return [[x, y], move]; };
+
+	for (x = 0; x < 8; x++) {
+		for (y = 0; y < 8; y++) {
+			if (state.board[x][y].color === state.turnColor) {
+				moves = moves.concat(possibleMoves(state.board, x, y).map(makeMove));
+			}
+		}
+	}
+
+	return moves;
+}
+
+function render(state) {
 	var x,
 		y,
 		data,
@@ -291,61 +317,50 @@ function renderBoard(board) {
 	for (x = 0; x < 8; x++) {
 		for (y = 0; y < 8; y++) {
 			PS.color(x, y, ((x + y) % 2 === 0) ? 0xC0C0C0 : 0xFFFFFF);
-			data = board[x][y];
+			data = state.board[x][y];
 			PS.glyph(x, y, data === 0 ? PS.DEFAULT : unicodePieces[data.color][data.piece]);
 		}
 	}
 
-	for (i = 0; i < availableMoves.length; i++) {
-		PS.color(availableMoves[i][0], availableMoves[i][1], 0xfaaa40);
-	}
+	availableMoves.forEach(function(coord) { PS.color(coord[0], coord[1], 0xfaaa40); });
 }
 
-PS.init = function() {
-	boardState = makeBoard();
-
-	PS.gridSize(8, 8);
-	renderBoard(boardState);
-};
-
 // Returns a move given the current board state.
-function AI(board) {
-	var x,
-		y,
-		m = [],
-		moves = [],
-		makeMove = function(move) { return [[x, y], move]; };
+function AI(state) {
+	var moves = allPossibleMoves(state);
 
-	for (x = 0; x < 8; x++) {
-		for (y = 0; y < 8; y++) {
-			if (board[x][y].color === "black") {
-				m = possibleMoves(board, x, y);
-				m = m.map(makeMove);
-				moves = moves.concat(m);
-			}
-		}
-	}
-
+	// Chose the move randomly.
 	return moves[PS.random(moves.length) - 1];
 }
 
+PS.init = function() {
+	state = initialState();
+
+	PS.gridSize(8, 8);
+	render(state);
+};
+
 PS.touch = function(x, y) {
 	var i,
-		data = boardState[x][y],
+		data = state.board[x][y],
 		aiMove;
 
 	for (i = 0; i < availableMoves.length; i++) {
 		if (availableMoves[i][0] === x && availableMoves[i][1] === y) {
-			move(boardState, selectedPiece[0], selectedPiece[1], x, y); 
+			move(state.board, selectedPiece[0], selectedPiece[1], x, y);
+
+			state.turnColor = state.turnColor === "white" ? "black" : "white";
 
 			selectedPiece = [];
 			availableMoves = [];
 
-			aiMove = AI(boardState);
+			aiMove = AI(state);
 
-			move(boardState, aiMove[0][0], aiMove[0][1], aiMove[1][0], aiMove[1][1]);
+			state.turnColor = state.turnColor === "white" ? "black" : "white";
 
-			renderBoard(boardState);
+			move(state.board, aiMove[0][0], aiMove[0][1], aiMove[1][0], aiMove[1][1]);
+
+			render(state);
 			return;
 		}
 	}
@@ -353,23 +368,12 @@ PS.touch = function(x, y) {
 	selectedPiece = [];
 	availableMoves = [];
 
-	if (data !== 0) {
-		if (whitesTurn) {
-			if (data.color === "white") {
-				selectedPiece = [x, y];
-				availableMoves = possibleMoves(boardState, x, y);
-			}
-		} else {
-			if (data.color === "black") {
-				selectedPiece = [x, y];
-				availableMoves = possibleMoves(boardState, x, y);
-			}
-		}
+	if (data !== 0 && data.color === state.turnColor) {
+		selectedPiece = [x, y];
+		availableMoves = possibleMoves(state.board, x, y);
 	}
 
-	renderBoard(boardState);
-
-
+	render(state);
 };
 
 // This quiets PS and jslint about missing/empty functions.
@@ -381,3 +385,4 @@ PS.keyDown  = function() { return; };
 PS.keyUp    = function() { return; };
 PS.swipe    = function() { return; };
 PS.input    = function() { return; };
+
